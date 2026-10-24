@@ -2,8 +2,7 @@ use soroban_sdk::{contract, contracterror, contractimpl, token, Address, BytesN,
 
 use crate::events::*;
 use crate::storage::{
-    DataKey, VaultConfig, VaultConfigV1, VaultConfigV2, VaultEntry, VaultEntryV1, VaultState,
-    VaultStateV1,
+    DataKey, VaultConfig, VaultConfigV2, VaultEntry, VaultEntryV1, VaultState, VaultStateV1,
 };
 
 // Design invariants worth knowing before changing anything here:
@@ -234,11 +233,6 @@ impl LumensVault {
         Self::check_paused(&env)?;
         Self::check_whitelisted(&env, &asset)?;
 
-        let config = Self::get_config(&env)?;
-        if lock_ledgers < config.min_lock_ledgers || lock_ledgers > config.max_lock_ledgers {
-            return Err(Error::InvalidLockPeriod);
-        }
-
         let token_client = token::Client::new(&env, &asset);
         token_client.transfer(&from, &env.current_contract_address(), &amount);
 
@@ -424,23 +418,6 @@ impl LumensVault {
             .instance()
             .get(&DataKey::Admin)
             .ok_or(Error::NotInitialized)
-    }
-
-    fn get_config(env: &Env) -> Result<VaultConfigV2, Error> {
-        let config: VaultConfig = env
-            .storage()
-            .instance()
-            .get(&DataKey::Config)
-            .ok_or(Error::NotInitialized)?;
-        match config {
-            VaultConfig::V1(VaultConfigV1 {
-                default_timelock_ledgers,
-            }) => Ok(VaultConfigV2 {
-                min_lock_ledgers: default_timelock_ledgers,
-                max_lock_ledgers: default_timelock_ledgers,
-            }),
-            VaultConfig::V2(c) => Ok(c),
-        }
     }
 
     fn validate_lock_bounds(min_lock_ledgers: u32, max_lock_ledgers: u32) -> Result<(), Error> {
